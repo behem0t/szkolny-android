@@ -82,6 +82,22 @@ class Librus(val app: App, val profile: Profile?, val loginStore: LoginStore, va
         }
     }
 
+    /**
+     * Run the portal login again, keeping the remaining login methods.
+     *
+     * [LibrusLogin] removes a login method from [DataLibrus.targetLoginMethods]
+     * before running it, so after a failed portal login the list no longer
+     * contains [LoginMethod.LIBRUS_PORTAL]. Calling [login] directly would
+     * then skip the portal and fail in the API login, which requires it
+     * (ERROR_LOGIN_METHOD_NOT_SATISFIED).
+     */
+    private fun retryPortalLogin() {
+        data.loginMethods.remove(LoginMethod.LIBRUS_PORTAL)
+        if (LoginMethod.LIBRUS_PORTAL !in data.targetLoginMethods)
+            data.targetLoginMethods.add(0, LoginMethod.LIBRUS_PORTAL)
+        login()
+    }
+
     private fun data() {
         d(TAG, "Endpoint IDs: ${data.targetEndpoints}")
         if (internalErrorList.isNotEmpty()) {
@@ -209,13 +225,14 @@ class Librus(val app: App, val profile: Profile?, val loginStore: LoginStore, va
                     ERROR_LOGIN_LIBRUS_PORTAL_CSRF_EXPIRED,
                     ERROR_LOGIN_LIBRUS_PORTAL_CODE_REVOKED,
                     ERROR_LOGIN_LIBRUS_PORTAL_CODE_EXPIRED -> {
-                        login()
+                        retryPortalLogin()
                     }
                     ERROR_LOGIN_LIBRUS_PORTAL_NO_REFRESH,
                     ERROR_LOGIN_LIBRUS_PORTAL_REFRESH_REVOKED,
                     ERROR_LOGIN_LIBRUS_PORTAL_REFRESH_INVALID -> {
                         data.portalRefreshToken = null
-                        login()
+                        data.portalTokenExpiryTime = 0
+                        retryPortalLogin()
                     }
                     ERROR_LOGIN_LIBRUS_SYNERGIA_TOKEN_INVALID,
                     ERROR_LOGIN_LIBRUS_SYNERGIA_NO_TOKEN,
