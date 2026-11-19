@@ -268,6 +268,15 @@ class LibrusLoginPortal(val data: DataLibrus, val onSuccess: () -> Unit) {
                         "Check the `redirect_uri` parameter" -> ERROR_LOGIN_LIBRUS_PORTAL_NO_REDIRECT
                         "unsupported_grant_type" -> ERROR_LOGIN_LIBRUS_PORTAL_UNSUPPORTED_GRANT
                         "invalid_client" -> ERROR_LOGIN_LIBRUS_PORTAL_INVALID_CLIENT_ID
+                        // newer OAuth2 server versions respond with HTTP 400
+                        // and "invalid_grant" for an expired/invalid token
+                        "Token has expired",
+                        "The refresh token is invalid." ->
+                            if (refreshToken != null) ERROR_LOGIN_LIBRUS_PORTAL_REFRESH_INVALID
+                            else ERROR_LOGIN_LIBRUS_PORTAL_CODE_EXPIRED
+                        "invalid_grant", "invalid_request" ->
+                            if (refreshToken != null) ERROR_LOGIN_LIBRUS_PORTAL_REFRESH_INVALID
+                            else ERROR_LOGIN_LIBRUS_PORTAL_OTHER
                         else -> ERROR_LOGIN_LIBRUS_PORTAL_OTHER
                     }.let { errorCode ->
                         data.error(ApiError(TAG, errorCode)
@@ -310,6 +319,7 @@ class LibrusLoginPortal(val data: DataLibrus, val onSuccess: () -> Unit) {
                 .userAgent(LIBRUS_USER_AGENT)
                 .addParams(params)
                 .post()
+                .allowErrorCode(HTTP_BAD_REQUEST)
                 .allowErrorCode(HTTP_UNAUTHORIZED)
                 .callback(callback)
                 .build()
